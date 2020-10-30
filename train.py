@@ -21,7 +21,7 @@ import torch.nn.functional as F
 import torchvision.datasets as dset
 import torchvision.transforms as transforms
 from models.model import CifarResNeXt
-
+import datetime
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Trains ResNeXt on CIFAR', 
             formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -49,6 +49,7 @@ if __name__ == '__main__':
     parser.add_argument('--widen_factor', type=int, default=4, help='Widen factor. 4 -> 64, 8 -> 128, ...')
     # Acceleration
     parser.add_argument('--ngpu', type=int, default=1, help='0 = CPU.')
+    parser.add_argument('--gpu_id_list', type=str, default='', help="gpu id")
     parser.add_argument('--prefetch', type=int, default=2, help='Pre-fetching threads.')
     # i/o
     parser.add_argument('--log', type=str, default='./', help='Log folder.')
@@ -58,6 +59,7 @@ if __name__ == '__main__':
     if not os.path.isdir(args.log):
         os.makedirs(args.log)
     log = open(os.path.join(args.log, 'log.txt'), 'w')
+    nextline = '\n'
     state = {k: v for k, v in args._get_kwargs()}
     log.write(json.dumps(state) + '\n')
 
@@ -96,9 +98,19 @@ if __name__ == '__main__':
 
     # Init model, criterion, and optimizer
     net = CifarResNeXt(args.cardinality, args.depth, nlabels, args.base_width, args.widen_factor)
-    print(net)
+    log.write(f'{net}{nextline}')
+    log.flush()
+    
     if args.ngpu > 1:
-        net = torch.nn.DataParallel(net, device_ids=list(range(args.ngpu)))
+        if args.gpu_id_list:
+            net = torch.nn.DataParallel(net, device_ids=list(
+                map(int, args.gpu_id_list.split(','))))
+            # choose
+            # gpus = '3,5'
+            # os.environ['CUDA_VISIBLE_DEVICES'] = gpus
+            # net = torch.nn.DataParallel(net)
+        else:
+            net = torch.nn.DataParallel(net, device_ids=list(range(args.ngpu)))
 
     if args.ngpu > 0:
         net.cuda()
@@ -152,8 +164,14 @@ if __name__ == '__main__':
 
 
     # Main loop
+    starttime = datetime.datetime.now()
+    # log.write(starttime)
+    log.write(f'{starttime}{nextline}')
+
     best_accuracy = 0.0
     for epoch in range(args.epochs):
+        epochstarttime = datetime.datetime.now()
+
         if epoch in args.schedule:
             state['learning_rate'] *= args.gamma
             for param_group in optimizer.param_groups:
@@ -166,8 +184,16 @@ if __name__ == '__main__':
             best_accuracy = state['test_accuracy']
             torch.save(net.state_dict(), os.path.join(args.save, 'model.pytorch'))
         log.write('%s\n' % json.dumps(state))
-        log.flush()
-        print(state)
-        print("Best accuracy: %f" % best_accuracy)
+        # print(state)
+        log.write("Best accuracy: %f\n" % best_accuracy)
 
+        epochendtime = datetime.datetime.now()
+        log.write(
+            f'end: {epochendtime}; len: {epochendtime - epochstarttime}{nextline}')
+        log.flush()
+
+    endtime = datetime.datetime.now()
+    log.write(
+        f'end: {endtime}; len: {endtime - starttime}{nextline}')
+    log.flush()
     log.close()

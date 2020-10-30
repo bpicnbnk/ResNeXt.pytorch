@@ -94,3 +94,6 @@ snapshots
 logs
 *.pytorch
 *.tar.bz
+DATASETS
+*.txt
+script
