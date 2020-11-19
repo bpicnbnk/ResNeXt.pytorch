@@ -1,0 +1,55 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "train_cifar_10",
+            "type": "shell",
+            "command": "python",
+            "args": [
+                "-u",
+                "train.py",
+                "~/DATASETS/cifar.python",
+                "cifar10",
+                "-s",
+                "./snapshots",
+                "--log",
+                "./logs",
+                "--ngpu",
+                "2",
+                "--learning_rate",
+                "0.05",
+                "-b",
+                "128"
+            ],
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "test_cifar_10",
+            "type": "shell",
+            "command": "python",
+            "args": [
+                "-u",
+                "test.py",
+                "~/DATASETS/cifar.python",
+                "cifar10",
+                "--ngpu",
+                "2",
+                "--load",
+                "./snapshots/model.pytorch",
+                "--test_bs",
+                "128"
+            ],
+            "problemMatcher": [],
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            }
+        }
+    ]
+}

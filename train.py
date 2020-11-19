@@ -182,7 +182,8 @@ if __name__ == '__main__':
         test()
         if state['test_accuracy'] > best_accuracy:
             best_accuracy = state['test_accuracy']
-            torch.save(net.state_dict(), os.path.join(args.save, 'model.pytorch'))
+            torch.save(net.state_dict(), os.path.join(
+                args.save, f'{args.dataset}_model.pytorch'))
         log.write('%s\n' % json.dumps(state))
         # print(state)
         log.write("Best accuracy: %f\n" % best_accuracy)

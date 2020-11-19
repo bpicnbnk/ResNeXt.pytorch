@@ -1,3 +1,10 @@
+# self
+DATASETS
+*.txt
+script
+tempCode*
+figure
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -94,6 +101,3 @@ snapshots
 logs
 *.pytorch
 *.tar.bz
-DATASETS
-*.txt
-script
