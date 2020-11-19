@@ -84,7 +84,11 @@ def test():
 
     # paralleize model 
     if args.ngpu > 1:
-        net = torch.nn.DataParallel(net, device_ids=list(range(args.ngpu)))
+        if args.gpu_id_list:
+            net = torch.nn.DataParallel(net, device_ids=list(
+                map(int, args.gpu_id_list.split(','))))
+        else:
+            net = torch.nn.DataParallel(net, device_ids=list(range(args.ngpu)))
     if args.ngpu > 0:
         net.cuda()
    

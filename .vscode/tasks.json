@@ -21,7 +21,8 @@
                 "--learning_rate",
                 "0.05",
                 "-b",
-                "128"
+                "128",
+                // "--gpu_id_list=3,5"
             ],
             "problemMatcher": [],
             "group": {
@@ -41,9 +42,10 @@
                 "--ngpu",
                 "2",
                 "--load",
-                "./snapshots/model.pytorch",
+                "./snapshots/cifar10_model.pytorch",
                 "--test_bs",
-                "128"
+                "128",
+                // "--gpu_id_list=3,5"
             ],
             "problemMatcher": [],
             "group": {
