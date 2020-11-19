@@ -58,7 +58,7 @@ if __name__ == '__main__':
     # Init logger
     if not os.path.isdir(args.log):
         os.makedirs(args.log)
-    log = open(os.path.join(args.log, 'log.txt'), 'w')
+    log = open(os.path.join(args.log, f'log_train_{args.dataset}_{args.ngpu}gpu.txt'), 'w')
     nextline = '\n'
     state = {k: v for k, v in args._get_kwargs()}
     log.write(json.dumps(state) + '\n')
@@ -100,20 +100,25 @@ if __name__ == '__main__':
     net = CifarResNeXt(args.cardinality, args.depth, nlabels, args.base_width, args.widen_factor)
     log.write(f'{net}{nextline}')
     log.flush()
-    
+
+    device_ids = list(range(args.ngpu))
     if args.ngpu > 1:
         if args.gpu_id_list:
-            net = torch.nn.DataParallel(net, device_ids=list(
-                map(int, args.gpu_id_list.split(','))))
-            # choose
-            # gpus = '3,5'
-            # os.environ['CUDA_VISIBLE_DEVICES'] = gpus
-            # net = torch.nn.DataParallel(net)
-        else:
-            net = torch.nn.DataParallel(net, device_ids=list(range(args.ngpu)))
+            # device_ids = list(map(int, args.gpu_id_list.split(',')))
+            # os.environ['CUDA_VISIBLE_DEVICES']作用是只允许gpu gpu_id_list='3,5'可用,
+            # 然后使用Model = nn.DataParallel(Model, device_ids=[0,1])，作用是从可用的两个gpu中搜索第0和第1个位置的gpu。
+            os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu_id_list
+        net = torch.nn.DataParallel(net, device_ids=device_ids)
 
     if args.ngpu > 0:
+        # choose gpu to load model,defalt cuda:0
         net.cuda()
+        # to solve warning :module must have its parameters and buffers on device cuda:3 (device_ids[0]) but found one of them on device: cuda:0
+        # first:not validate
+        # net.cuda(device=device_ids[0])
+        # second:
+        # device = torch.device(f'cuda:{device_ids[0]}')
+        # net.to(device)
 
     optimizer = torch.optim.SGD(net.parameters(), state['learning_rate'], momentum=state['momentum'],
                                 weight_decay=state['decay'], nesterov=True)

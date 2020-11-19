@@ -45,6 +45,9 @@ def get_args():
     parser.add_argument('--prefetch', type=int, default=2, help='Pre-fetching threads.')
     # i/o
     parser.add_argument('--log', type=str, default='./', help='Log folder.')
+    
+    parser.add_argument('--gpu_id_list', type=str, default='', help="gpu id")
+    
     args = parser.parse_args()
     return args
 
@@ -58,7 +61,7 @@ def test():
     # prepare test data parts
     test_transform = transforms.Compose(
         [transforms.ToTensor(), transforms.Normalize(mean, std)])
-    test_data = dset.CIFAR100(args.data_path, train=False, transform=test_transform, download=True)
+    # test_data = dset.CIFAR100(args.data_path, train=False, transform=test_transform, download=True)
     if args.dataset == 'cifar10':
         test_data = dset.CIFAR10(args.data_path, train=False, transform=test_transform, download=True)
         nlabels = 10
@@ -83,12 +86,17 @@ def test():
     net.load_state_dict(loaded_state_dict)
 
     # paralleize model 
+    device_ids = list(range(args.ngpu))
     if args.ngpu > 1:
         if args.gpu_id_list:
-            net = torch.nn.DataParallel(net, device_ids=list(
-                map(int, args.gpu_id_list.split(','))))
-        else:
-            net = torch.nn.DataParallel(net, device_ids=list(range(args.ngpu)))
+            # device_ids = list(map(int, args.gpu_id_list.split(',')))
+            # os.environ['CUDA_VISIBLE_DEVICES']作用是只允许gpu gpu_id_list='3,5'可用,
+            # 然后使用Model = nn.DataParallel(Model, device_ids=[0,1])，作用是从可用的两个gpu中搜索第0和第1个位置的gpu。
+            os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu_id_list
+            # net = torch.nn.DataParallel(net, device_ids=device_ids)
+        # torch.nn.DataParallel : use all gpus by default
+        # net = torch.nn.DataParallel(net)
+        net = torch.nn.DataParallel(net, device_ids=device_ids)
     if args.ngpu > 0:
         net.cuda()
    
