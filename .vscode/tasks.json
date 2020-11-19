@@ -4,26 +4,31 @@
     "version": "2.0.0",
     "tasks": [
         {
+            "label": "conda",
+            "type": "shell",
+            "command": "source /home/server/anaconda3/bin/activate && conda activate pt3.7"
+        },
+        {
             "label": "train_cifar_10",
             "type": "shell",
-            "command": "python",
-            "args": [
-                "-u",
-                "train.py",
-                "~/DATASETS/cifar.python",
-                "cifar10",
-                "-s",
-                "./snapshots",
-                "--log",
-                "./logs",
-                "--ngpu",
-                "2",
-                "--learning_rate",
-                "0.05",
-                "-b",
-                "128",
-                // "--gpu_id_list=3,5"
-            ],
+            "command": "source /home/server/anaconda3/bin/activate && conda activate pt3.7 && python -u train.py ./DATASETS/cifar.python cifar10 -s ./snapshots --log ./logs --ngpu 2 --learning_rate 0.05 -b 128",
+            // "args": [
+            //     "-u",
+            //     "train.py",
+            //     "./DATASETS/cifar.python",
+            //     "cifar10",
+            //     "-s",
+            //     "./snapshots",
+            //     "--log",
+            //     "./logs",
+            //     "--ngpu",
+            //     "2",
+            //     "--learning_rate",
+            //     "0.05",
+            //     "-b",
+            //     "128",
+            //     // "--gpu_id_list=3,5"
+            // ],
             "problemMatcher": [],
             "group": {
                 "kind": "build",
@@ -31,27 +36,39 @@
             }
         },
         {
+            "label": "train_cifar_100",
+            "type": "shell",
+            "command": "source /home/server/anaconda3/bin/activate && conda activate pt3.7 && python -u train.py ./DATASETS/cifar.python cifar100 -s ./snapshots --log ./logs --ngpu 2 --learning_rate 0.05 -b 128",
+            "problemMatcher": []
+        },
+        {
             "label": "test_cifar_10",
             "type": "shell",
-            "command": "python",
-            "args": [
-                "-u",
-                "test.py",
-                "~/DATASETS/cifar.python",
-                "cifar10",
-                "--ngpu",
-                "2",
-                "--load",
-                "./snapshots/cifar10_model.pytorch",
-                "--test_bs",
-                "128",
-                // "--gpu_id_list=3,5"
-            ],
+            "command": "source /home/server/anaconda3/bin/activate && conda activate pt3.7 && python -u test.py ./DATASETS/cifar.python cifar10 --ngpu 2 --load ./snapshots/cifar10_model.pytorch --test_bs 128",
+            // "args": [
+            //     "-u",
+            //     "test.py",
+            //     "./DATASETS/cifar.python",
+            //     "cifar10",
+            //     "--ngpu",
+            //     "2",
+            //     "--load",
+            //     "./snapshots/cifar10_model.pytorch",
+            //     "--test_bs",
+            //     "128",
+            //     // "--gpu_id_list=3,5"
+            // ],
             "problemMatcher": [],
             "group": {
                 "kind": "test",
                 "isDefault": true
             }
+        },
+        {
+            "label": "test_cifar_100",
+            "type": "shell",
+            "command": "source /home/server/anaconda3/bin/activate && conda activate pt3.7 && python -u test.py ./DATASETS/cifar.python cifar100 --ngpu 2 --load ./snapshots/cifar100_model.pytorch --test_bs 128",
+            "problemMatcher": []
         }
     ]
 }

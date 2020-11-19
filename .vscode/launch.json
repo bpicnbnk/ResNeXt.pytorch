@@ -12,7 +12,7 @@
             "args": [
                 // "-u",
                 // "test.py",
-                "~/DATASETS/cifar.python",
+                "./DATASETS/cifar.python",
                 "cifar10",
                 "--ngpu",
                 "2",
@@ -32,19 +32,19 @@
             "args": [
                 // "-u",
                 // "train.py",
-                "~/DATASETS/cifar.python",
+                "./DATASETS/cifar.python",
                 "cifar10",
                 "-s",
                 "./snapshots",
                 "--log",
                 "./logs",
                 "--ngpu",
-                "2",
+                "4",
                 "--learning_rate",
                 "0.05",
                 "-b",
                 "128",
-                // "--gpu_id_list=3,5"
+                "--gpu_id_list=3,4,5,6"
             ],
             "console": "integratedTerminal"
         }
