@@ -46,9 +46,11 @@ class SReLU(nn.Module):
 
 class SharedScale(nn.Module):
     """Channel-shared scalar"""
+
     def __init__(self):
         super(SharedScale, self).__init__()
-        self.scale = nn.Parameter(torch.ones(1, 1, 1, 1) * C.ISON.RES_MULTIPLIER)
+        self.scale = nn.Parameter(torch.ones(
+            1, 1, 1, 1) * C.ISON.RES_MULTIPLIER)
 
     def forward(self, x):
         return x * self.scale
@@ -90,7 +92,8 @@ class BasicTransform(nn.Module):
         )
         if C.ISON.HAS_BN:
             self.a_bn = nn.BatchNorm2d(w_out)
-        self.a_relu = nn.ReLU(inplace=True) if not C.ISON.SReLU else SReLU(w_out)
+        self.a_relu = nn.ReLU(
+            inplace=True) if not C.ISON.SReLU else SReLU(w_out)
         # 3x3, BN
         self.b = nn.Conv2d(
             w_out, w_out, kernel_size=3,
@@ -112,32 +115,34 @@ class BasicTransform(nn.Module):
 class BottleneckTransform(nn.Module):
     """Bottleneck transformation: 1x1, 3x3, 1x1"""
 
-    def __init__(self, w_in, w_out, stride, w_b, num_gs):
+    # def __init__(self, in_channels, out_channels, stride, cardinality, base_width, widen_factor):
+    # def __init__(self, w_in, w_out, stride, w_b, num_gs):
+    def __init__(self, w_in, w_out, stride, cardinality, w_b, widen_factor):
         super(BottleneckTransform, self).__init__()
-        self._construct(w_in, w_out, stride, w_b, num_gs)
 
-    def _construct(self, w_in, w_out, stride, w_b, num_gs):
+        width_ratio = w_out / (widen_factor * 64.)
+        D = cardinality * int(w_b * width_ratio)
         # MSRA -> stride=2 is on 1x1; TH/C2 -> stride=2 is on 3x3
         (str1x1, str3x3) = (1, stride)
         # 1x1, BN, ReLU
         self.a = nn.Conv2d(
-            w_in, w_b, kernel_size=1,
+            w_in, D, kernel_size=1,
             stride=str1x1, padding=0, bias=not C.ISON.HAS_BN and not C.ISON.SReLU
         )
         if C.ISON.HAS_BN:
-            self.a_bn = nn.BatchNorm2d(w_b)
-        self.a_relu = nn.ReLU(inplace=True) if not C.ISON.SReLU else SReLU(w_b)
+            self.a_bn = nn.BatchNorm2d(D)
+        self.a_relu = nn.ReLU(inplace=True) if not C.ISON.SReLU else SReLU(D)
         # 3x3, BN, ReLU
         self.b = nn.Conv2d(
-            w_b, w_b, kernel_size=3,
-            stride=str3x3, padding=1, groups=num_gs, bias=not C.ISON.HAS_BN and not C.ISON.SReLU
+            D, D, kernel_size=3,
+            stride=str3x3, padding=1, groups=cardinality, bias=not C.ISON.HAS_BN and not C.ISON.SReLU
         )
         if C.ISON.HAS_BN:
-            self.b_bn = nn.BatchNorm2d(w_b)
-        self.b_relu = nn.ReLU(inplace=True) if not C.ISON.SReLU else SReLU(w_b)
+            self.b_bn = nn.BatchNorm2d(D)
+        self.b_relu = nn.ReLU(inplace=True) if not C.ISON.SReLU else SReLU(D)
         # 1x1, BN
         self.c = nn.Conv2d(
-            w_b, w_out, kernel_size=1,
+            D, w_out, kernel_size=1,
             stride=1, padding=0, bias=not C.ISON.HAS_BN and not C.ISON.SReLU
         )
         if C.ISON.HAS_BN:
@@ -157,10 +162,11 @@ class ResBlock(nn.Module):
     """Residual block: x + F(x)"""
 
     def __init__(
-        self, w_in, w_out, stride, trans_fun, w_b=None, num_gs=1
+        self, w_in, w_out, stride, trans_fun, cardinality, w_b, widen_factor
     ):
         super(ResBlock, self).__init__()
-        self._construct(w_in, w_out, stride, trans_fun, w_b, num_gs)
+        self._construct(w_in, w_out, stride, trans_fun,
+                        cardinality, w_b, widen_factor)
 
     def _add_skip_proj(self, w_in, w_out, stride):
         self.proj = nn.Conv2d(
@@ -170,12 +176,13 @@ class ResBlock(nn.Module):
         if C.ISON.HAS_BN:
             self.bn = nn.BatchNorm2d(w_out)
 
-    def _construct(self, w_in, w_out, stride, trans_fun, w_b, num_gs):
+    def _construct(self, w_in, w_out, stride, trans_fun, cardinality, w_b, widen_factor):
         # Use skip connection with projection if shape changes
         self.proj_block = (w_in != w_out) or (stride != 1)
         if self.proj_block and C.ISON.HAS_ST:
             self._add_skip_proj(w_in, w_out, stride)
-        self.f = trans_fun(w_in, w_out, stride, w_b, num_gs)
+        # BottleneckTransform __init__(self, w_in, w_out, stride, cardinality, w_b, widen_factor):
+        self.f = trans_fun(w_in, w_out, stride, cardinality, w_b, widen_factor)
         self.relu = nn.ReLU(True) if not C.ISON.SReLU else SReLU(w_out)
 
     def forward(self, x):
@@ -198,11 +205,11 @@ class ResBlock(nn.Module):
 class ResStage(nn.Module):
     """Stage of ResNet."""
 
-    def __init__(self, w_in, w_out, stride, d, w_b=None, num_gs=1):
+    def __init__(self, w_in, w_out, stride, d, cardinality, w_b, widen_factor=4):
         super(ResStage, self).__init__()
-        self._construct(w_in, w_out, stride, d, w_b, num_gs)
+        self._construct(w_in, w_out, stride, d, cardinality, w_b, widen_factor)
 
-    def _construct(self, w_in, w_out, stride, d, w_b, num_gs):
+    def _construct(self, w_in, w_out, stride, d, cardinality, w_b, widen_factor):
         # Construct the blocks
         for i in range(d):
             # Stride and w_in apply to the first block of the stage
@@ -212,7 +219,7 @@ class ResStage(nn.Module):
             trans_fun = get_trans_fun(C.ISON.TRANS_FUN)
             # Construct the block
             res_block = ResBlock(
-                b_w_in, w_out, b_stride, trans_fun, w_b, num_gs
+                b_w_in, w_out, b_stride, trans_fun, cardinality, w_b, widen_factor
             )
             self.add_module('b{}'.format(i + 1), res_block)
 
@@ -259,14 +266,129 @@ class ResStem(nn.Module):
         return x
 
 
-class ISONet(nn.Module):
-    """ResNet model."""
+class CifarISONext(nn.Module):
+    """CifarISONext model."""
 
-    def __init__(self):
-        super(ISONet, self).__init__()
+    def __init__(self, cardinality, w_b, widen_factor=4):
+        super(CifarISONext, self).__init__()
         # define network structures
         if 'CIFAR' in C.DATASET.NAME:
-            self._construct_cifar()
+            self._construct_cifar(cardinality, w_b, widen_factor)
+        else:
+            raise NotImplementedError
+        # initialization
+        self._network_init()
+
+    def _construct_cifar(self, cardinality, w_b, widen_factor):
+        assert (C.ISON.DEPTH - 2) % 6 == 0, \
+            'Model depth should be of the format 6n + 2 for cifar'
+        # Each stage has the same number of blocks for cifar
+        # 29
+        d = int((C.ISON.DEPTH - 2) / 9)
+        # Stem: (N, 3, 32, 32) -> (N, 16, 32, 32)
+        self.stem = ResStem(w_in=3, w_out=16)
+        # Stage 1: (N, 16, 32, 32) -> (N, 16, 32, 32)
+        self.s1 = ResStage(w_in=16, w_out=16, stride=1, d=d, cardinality, w_b, widen_factor)
+        # Stage 2: (N, 16, 32, 32) -> (N, 32, 16, 16)
+        self.s2 = ResStage(w_in=16, w_out=32, stride=2, d=d, cardinality, w_b, widen_factor)
+        # Stage 3: (N, 32, 16, 16) -> (N, 64, 8, 8)
+        self.s3 = ResStage(w_in=32, w_out=64, stride=2, d=d, cardinality, w_b, widen_factor)
+        # Head: (N, 64, 8, 8) -> (N, num_classes)
+        self.head = ResHead(w_in=64, nc=C.DATASET.NUM_CLASSES)
+
+    def _network_init(self):
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                if C.ISON.DIRAC_INIT:
+                    # the first 7x7 convolution we use pytorch default initialization
+                    # and not enforce orthogonality since the large input/output channel difference
+                    if m.kernel_size != (7, 7):
+                        nn.init.dirac_(m.weight)
+                else:
+                    # kaiming initialization used for ResNet results
+                    fan_out = m.kernel_size[0] * \
+                        m.kernel_size[1] * m.out_channels
+                    m.weight.data.normal_(mean=0.0, std=np.sqrt(2.0 / fan_out))
+                if hasattr(m, 'bias') and m.bias is not None:
+                    nn.init.zeros_(m.bias)
+            elif isinstance(m, nn.BatchNorm2d):
+                zero_init_gamma = (
+                    hasattr(m, 'final_bn') and m.final_bn
+                )
+                m.weight.data.fill_(0.0 if zero_init_gamma else 1.0)
+                m.bias.data.zero_()
+
+    def forward(self, x):
+        for module in self.children():
+            x = module(x)
+        return x
+
+    def forward_naive(self, x):
+        # used for visualization of feature map
+        feature_list = []
+        residual_list = []
+        shortcut_list = []
+        x = self.stem(x)
+        for s_name, b_max in zip(['s1', 's2', 's3', 's4'], [3, 4, 6, 3]):
+            for b_num in range(1, b_max + 1):
+                identity = x
+                x = eval(f'self.{s_name}.b{b_num}.f.a')(x)
+                feature_list.append(x)
+                x = eval(f'self.{s_name}.b{b_num}.f.a_relu')(x)
+                x = eval(f'self.{s_name}.b{b_num}.f.b')(x)
+                feature_list.append(x)
+
+                if C.ISON.HAS_ST:
+                    x = eval(f'self.{s_name}.b{b_num}.f.shared_scalar')(x)
+                    if eval(f'self.{s_name}.b{b_num}').proj_block:
+                        identity = eval(
+                            f'self.{s_name}.b{b_num}.proj')(identity)
+                    shortcut_list.append(identity)
+                    residual_list.append(x)
+                    x = x + identity
+
+                x = eval(f'self.{s_name}.b{b_num}.relu')(x)
+        x = self.head(x)
+        return x, feature_list, shortcut_list, residual_list
+
+    def ortho(self):
+        ortho_penalty = []
+        cnt = 0
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                if m.kernel_size == (7, 7) or m.weight.shape[1] == 3:
+                    continue
+                o = self.ortho_conv(m)
+                cnt += 1
+                ortho_penalty.append(o)
+        ortho_penalty = sum(ortho_penalty)
+        return ortho_penalty
+
+    def ortho_conv(self, m, device='cuda'):
+        operator = m.weight
+        operand = torch.cat(torch.chunk(m.weight, m.groups, dim=0), dim=1)
+        transposed = m.weight.shape[1] < m.weight.shape[0]
+        num_channels = m.weight.shape[1] if transposed else m.weight.shape[0]
+        if transposed:
+            operand = operand.transpose(1, 0)
+            operator = operator.transpose(1, 0)
+        gram = F.conv2d(operand, operator, padding=(m.kernel_size[0] - 1, m.kernel_size[1] - 1),
+                        stride=m.stride, groups=m.groups)
+        identity = torch.zeros(gram.shape).to(device)
+        identity[:, :, identity.shape[2] // 2, identity.shape[3] //
+                 2] = torch.eye(num_channels).repeat(1, m.groups)
+        out = torch.sum((gram - identity) ** 2.0) / 2.0
+        return out
+
+
+class ISONext(nn.Module):
+    """ResNet model."""
+
+    def __init__(self, cardinality, w_b, widen_factor=4):
+        super(ISONext, self).__init__()
+        # define network structures
+        if 'CIFAR' in C.DATASET.NAME:
+            self._construct_cifar(cardinality, w_b, widen_factor)
         elif C.ISON.TRANS_FUN == 'basic_transform':
             self._construct_imagenet_basic()
         elif C.ISON.TRANS_FUN == 'bottleneck_transform':
@@ -276,7 +398,7 @@ class ISONet(nn.Module):
         # initialization
         self._network_init()
 
-    def _construct_cifar(self):
+    def _construct_cifar(self, cardinality, w_b, widen_factor):
         assert (C.ISON.DEPTH - 2) % 6 == 0, \
             'Model depth should be of the format 6n + 2 for cifar'
         # Each stage has the same number of blocks for cifar
@@ -284,11 +406,11 @@ class ISONet(nn.Module):
         # Stem: (N, 3, 32, 32) -> (N, 16, 32, 32)
         self.stem = ResStem(w_in=3, w_out=16)
         # Stage 1: (N, 16, 32, 32) -> (N, 16, 32, 32)
-        self.s1 = ResStage(w_in=16, w_out=16, stride=1, d=d)
+        self.s1 = ResStage(w_in=16, w_out=16, stride=1, d=d, cardinality, w_b, widen_factor)
         # Stage 2: (N, 16, 32, 32) -> (N, 32, 16, 16)
-        self.s2 = ResStage(w_in=16, w_out=32, stride=2, d=d)
+        self.s2 = ResStage(w_in=16, w_out=32, stride=2, d=d, cardinality, w_b, widen_factor)
         # Stage 3: (N, 32, 16, 16) -> (N, 64, 8, 8)
-        self.s3 = ResStage(w_in=32, w_out=64, stride=2, d=d)
+        self.s3 = ResStage(w_in=32, w_out=64, stride=2, d=d, cardinality, w_b, widen_factor)
         # Head: (N, 64, 8, 8) -> (N, num_classes)
         self.head = ResHead(w_in=64, nc=C.DATASET.NUM_CLASSES)
 
@@ -350,7 +472,8 @@ class ISONet(nn.Module):
                         nn.init.dirac_(m.weight)
                 else:
                     # kaiming initialization used for ResNet results
-                    fan_out = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
+                    fan_out = m.kernel_size[0] * \
+                        m.kernel_size[1] * m.out_channels
                     m.weight.data.normal_(mean=0.0, std=np.sqrt(2.0 / fan_out))
                 if hasattr(m, 'bias') and m.bias is not None:
                     nn.init.zeros_(m.bias)
@@ -384,7 +507,8 @@ class ISONet(nn.Module):
                 if C.ISON.HAS_ST:
                     x = eval(f'self.{s_name}.b{b_num}.f.shared_scalar')(x)
                     if eval(f'self.{s_name}.b{b_num}').proj_block:
-                        identity = eval(f'self.{s_name}.b{b_num}.proj')(identity)
+                        identity = eval(
+                            f'self.{s_name}.b{b_num}.proj')(identity)
                     shortcut_list.append(identity)
                     residual_list.append(x)
                     x = x + identity
@@ -417,6 +541,7 @@ class ISONet(nn.Module):
         gram = F.conv2d(operand, operator, padding=(m.kernel_size[0] - 1, m.kernel_size[1] - 1),
                         stride=m.stride, groups=m.groups)
         identity = torch.zeros(gram.shape).to(device)
-        identity[:, :, identity.shape[2] // 2, identity.shape[3] // 2] = torch.eye(num_channels).repeat(1, m.groups)
+        identity[:, :, identity.shape[2] // 2, identity.shape[3] //
+                 2] = torch.eye(num_channels).repeat(1, m.groups)
         out = torch.sum((gram - identity) ** 2.0) / 2.0
         return out
