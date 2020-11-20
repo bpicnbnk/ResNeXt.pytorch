@@ -1,1 +1,1 @@
-from isonet.models.isonet import *
+from isonet.models.isonext import *
