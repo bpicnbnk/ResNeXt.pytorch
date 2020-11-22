@@ -271,30 +271,38 @@ class CifarISONext(nn.Module):
 
     def __init__(self, cardinality, w_b, widen_factor=4):
         super(CifarISONext, self).__init__()
+        self.cardinality = cardinality
+        self.w_b = w_b
+        self.widen_factor = widen_factor
+        self.stages = [64, 64 * self.widen_factor, 128 *
+                       self.widen_factor, 256 * self.widen_factor]
         # define network structures
         if 'CIFAR' in C.DATASET.NAME:
-            self._construct_cifar(cardinality, w_b, widen_factor)
+            self._construct_cifar()
         else:
             raise NotImplementedError
         # initialization
         self._network_init()
 
-    def _construct_cifar(self, cardinality, w_b, widen_factor):
-        assert (C.ISON.DEPTH - 2) % 6 == 0, \
+    def _construct_cifar(self):
+        assert (C.ISON.DEPTH - 2) % 9 == 0, \
             'Model depth should be of the format 6n + 2 for cifar'
         # Each stage has the same number of blocks for cifar
         # 29
         d = int((C.ISON.DEPTH - 2) / 9)
         # Stem: (N, 3, 32, 32) -> (N, 16, 32, 32)
-        self.stem = ResStem(w_in=3, w_out=16)
+        self.stem = ResStem(3, self.stages[0])
         # Stage 1: (N, 16, 32, 32) -> (N, 16, 32, 32)
-        self.s1 = ResStage(w_in=16, w_out=16, stride=1, d=d, cardinality, w_b, widen_factor)
+        self.s1 = ResStage(self.stages[0], self.stages[1], stride=1, d=d,
+                           cardinality=self.cardinality, w_b=self.w_b, widen_factor=self.widen_factor)
         # Stage 2: (N, 16, 32, 32) -> (N, 32, 16, 16)
-        self.s2 = ResStage(w_in=16, w_out=32, stride=2, d=d, cardinality, w_b, widen_factor)
+        self.s2 = ResStage(self.stages[1], self.stages[2], stride=2, d=d,
+                           cardinality=self.cardinality, w_b=self.w_b, widen_factor=self.widen_factor)
         # Stage 3: (N, 32, 16, 16) -> (N, 64, 8, 8)
-        self.s3 = ResStage(w_in=32, w_out=64, stride=2, d=d, cardinality, w_b, widen_factor)
+        self.s3 = ResStage(self.stages[2], self.stages[3], stride=2, d=d,
+                           cardinality=self.cardinality, w_b=self.w_b, widen_factor=self.widen_factor)
         # Head: (N, 64, 8, 8) -> (N, num_classes)
-        self.head = ResHead(w_in=64, nc=C.DATASET.NUM_CLASSES)
+        self.head = ResHead(self.stages[3], nc=C.DATASET.NUM_CLASSES)
 
     def _network_init(self):
         for m in self.modules():
@@ -381,167 +389,3 @@ class CifarISONext(nn.Module):
         return out
 
 
-class ISONext(nn.Module):
-    """ResNet model."""
-
-    def __init__(self, cardinality, w_b, widen_factor=4):
-        super(ISONext, self).__init__()
-        # define network structures
-        if 'CIFAR' in C.DATASET.NAME:
-            self._construct_cifar(cardinality, w_b, widen_factor)
-        elif C.ISON.TRANS_FUN == 'basic_transform':
-            self._construct_imagenet_basic()
-        elif C.ISON.TRANS_FUN == 'bottleneck_transform':
-            self._construct_imagenet()
-        else:
-            raise NotImplementedError
-        # initialization
-        self._network_init()
-
-    def _construct_cifar(self, cardinality, w_b, widen_factor):
-        assert (C.ISON.DEPTH - 2) % 6 == 0, \
-            'Model depth should be of the format 6n + 2 for cifar'
-        # Each stage has the same number of blocks for cifar
-        d = int((C.ISON.DEPTH - 2) / 6)
-        # Stem: (N, 3, 32, 32) -> (N, 16, 32, 32)
-        self.stem = ResStem(w_in=3, w_out=16)
-        # Stage 1: (N, 16, 32, 32) -> (N, 16, 32, 32)
-        self.s1 = ResStage(w_in=16, w_out=16, stride=1, d=d, cardinality, w_b, widen_factor)
-        # Stage 2: (N, 16, 32, 32) -> (N, 32, 16, 16)
-        self.s2 = ResStage(w_in=16, w_out=32, stride=2, d=d, cardinality, w_b, widen_factor)
-        # Stage 3: (N, 32, 16, 16) -> (N, 64, 8, 8)
-        self.s3 = ResStage(w_in=32, w_out=64, stride=2, d=d, cardinality, w_b, widen_factor)
-        # Head: (N, 64, 8, 8) -> (N, num_classes)
-        self.head = ResHead(w_in=64, nc=C.DATASET.NUM_CLASSES)
-
-    def _construct_imagenet_basic(self):
-        # Retrieve the number of blocks per stage
-        (d1, d2, d3, d4) = _IN_STAGE_DS[C.ISON.DEPTH]
-        # Compute the initial bottleneck width
-        # Stem: (N, 3, 224, 224) -> (N, 64, 56, 56)
-        self.stem = ResStem(w_in=3, w_out=64)
-        # Stage 1: (N, 64, 56, 56) -> (N, 256, 56, 56)
-        self.s1 = ResStage(w_in=64, w_out=64, stride=1, d=d1)
-        # Stage 2: (N, 256, 56, 56) -> (N, 512, 28, 28)
-        self.s2 = ResStage(w_in=64, w_out=128, stride=2, d=d2)
-        # Stage 3: (N, 512, 56, 56) -> (N, 1024, 14, 14)
-        self.s3 = ResStage(w_in=128, w_out=256, stride=2, d=d3)
-        # Stage 4: (N, 1024, 14, 14) -> (N, 2048, 7, 7)
-        self.s4 = ResStage(w_in=256, w_out=512, stride=2, d=d4)
-        # Head: (N, 2048, 7, 7) -> (N, num_classes)
-        self.head = ResHead(w_in=512, nc=C.DATASET.NUM_CLASSES)
-
-    def _construct_imagenet(self):
-        # Retrieve the number of blocks per stage
-        (d1, d2, d3, d4) = _IN_STAGE_DS[C.ISON.DEPTH]
-        # Compute the initial bottleneck width
-        num_gs = 1  # C.RESNET.NUM_GROUPS
-        w_b = 64  # C.RESNET.WIDTH_PER_GROUP * num_gs
-        # Stem: (N, 3, 224, 224) -> (N, 64, 56, 56)
-        self.stem = ResStem(w_in=3, w_out=64)
-        # Stage 1: (N, 64, 56, 56) -> (N, 256, 56, 56)
-        self.s1 = ResStage(
-            w_in=64, w_out=256, stride=1, d=d1,
-            w_b=w_b, num_gs=num_gs
-        )
-        # Stage 2: (N, 256, 56, 56) -> (N, 512, 28, 28)
-        self.s2 = ResStage(
-            w_in=256, w_out=512, stride=2, d=d2,
-            w_b=w_b * 2, num_gs=num_gs
-        )
-        # Stage 3: (N, 512, 56, 56) -> (N, 1024, 14, 14)
-        self.s3 = ResStage(
-            w_in=512, w_out=1024, stride=2, d=d3,
-            w_b=w_b * 4, num_gs=num_gs
-        )
-        # Stage 4: (N, 1024, 14, 14) -> (N, 2048, 7, 7)
-        self.s4 = ResStage(
-            w_in=1024, w_out=2048, stride=2, d=d4,
-            w_b=w_b * 8, num_gs=num_gs
-        )
-        # Head: (N, 2048, 7, 7) -> (N, num_classes)
-        self.head = ResHead(w_in=2048, nc=C.DATASET.NUM_CLASSES)
-
-    def _network_init(self):
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                if C.ISON.DIRAC_INIT:
-                    # the first 7x7 convolution we use pytorch default initialization
-                    # and not enforce orthogonality since the large input/output channel difference
-                    if m.kernel_size != (7, 7):
-                        nn.init.dirac_(m.weight)
-                else:
-                    # kaiming initialization used for ResNet results
-                    fan_out = m.kernel_size[0] * \
-                        m.kernel_size[1] * m.out_channels
-                    m.weight.data.normal_(mean=0.0, std=np.sqrt(2.0 / fan_out))
-                if hasattr(m, 'bias') and m.bias is not None:
-                    nn.init.zeros_(m.bias)
-            elif isinstance(m, nn.BatchNorm2d):
-                zero_init_gamma = (
-                    hasattr(m, 'final_bn') and m.final_bn
-                )
-                m.weight.data.fill_(0.0 if zero_init_gamma else 1.0)
-                m.bias.data.zero_()
-
-    def forward(self, x):
-        for module in self.children():
-            x = module(x)
-        return x
-
-    def forward_naive(self, x):
-        # used for visualization of feature map
-        feature_list = []
-        residual_list = []
-        shortcut_list = []
-        x = self.stem(x)
-        for s_name, b_max in zip(['s1', 's2', 's3', 's4'], [3, 4, 6, 3]):
-            for b_num in range(1, b_max + 1):
-                identity = x
-                x = eval(f'self.{s_name}.b{b_num}.f.a')(x)
-                feature_list.append(x)
-                x = eval(f'self.{s_name}.b{b_num}.f.a_relu')(x)
-                x = eval(f'self.{s_name}.b{b_num}.f.b')(x)
-                feature_list.append(x)
-
-                if C.ISON.HAS_ST:
-                    x = eval(f'self.{s_name}.b{b_num}.f.shared_scalar')(x)
-                    if eval(f'self.{s_name}.b{b_num}').proj_block:
-                        identity = eval(
-                            f'self.{s_name}.b{b_num}.proj')(identity)
-                    shortcut_list.append(identity)
-                    residual_list.append(x)
-                    x = x + identity
-
-                x = eval(f'self.{s_name}.b{b_num}.relu')(x)
-        x = self.head(x)
-        return x, feature_list, shortcut_list, residual_list
-
-    def ortho(self):
-        ortho_penalty = []
-        cnt = 0
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                if m.kernel_size == (7, 7) or m.weight.shape[1] == 3:
-                    continue
-                o = self.ortho_conv(m)
-                cnt += 1
-                ortho_penalty.append(o)
-        ortho_penalty = sum(ortho_penalty)
-        return ortho_penalty
-
-    def ortho_conv(self, m, device='cuda'):
-        operator = m.weight
-        operand = torch.cat(torch.chunk(m.weight, m.groups, dim=0), dim=1)
-        transposed = m.weight.shape[1] < m.weight.shape[0]
-        num_channels = m.weight.shape[1] if transposed else m.weight.shape[0]
-        if transposed:
-            operand = operand.transpose(1, 0)
-            operator = operator.transpose(1, 0)
-        gram = F.conv2d(operand, operator, padding=(m.kernel_size[0] - 1, m.kernel_size[1] - 1),
-                        stride=m.stride, groups=m.groups)
-        identity = torch.zeros(gram.shape).to(device)
-        identity[:, :, identity.shape[2] // 2, identity.shape[3] //
-                 2] = torch.eye(num_channels).repeat(1, m.groups)
-        out = torch.sum((gram - identity) ** 2.0) / 2.0
-        return out

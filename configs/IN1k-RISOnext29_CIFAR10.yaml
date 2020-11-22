@@ -20,3 +20,4 @@ ISON:
   RES_MULTIPLIER: 0.0
   DROPOUT: True
   DROPOUT_RATE: 0.4
+  TRANS_FUN: bottleneck_transform

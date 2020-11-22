@@ -55,11 +55,22 @@ if __name__ == '__main__':
     parser.add_argument('--log', type=str, default='./', help='Log folder.')
     args = parser.parse_args()
 
+    
     # Init logger
     if not os.path.isdir(args.log):
         os.makedirs(args.log)
     log = open(os.path.join(args.log, f'log_train_{args.dataset}_{args.ngpu}gpu.txt'), 'w')
+
     nextline = '\n'
+    starttime = datetime.datetime.now()
+    # log.write(starttime)
+    log.write(f'{starttime}{nextline}')
+
+    # save model name
+    ttuple = starttime.timetuple()
+    startt = '_'.join(list(map(str, ttuple[1:6])))
+    modeloutput = f'{args.dataset}_resnext_{startt}_model.pytorch'
+
     state = {k: v for k, v in args._get_kwargs()}
     log.write(json.dumps(state) + '\n')
 
@@ -169,9 +180,6 @@ if __name__ == '__main__':
 
 
     # Main loop
-    starttime = datetime.datetime.now()
-    # log.write(starttime)
-    log.write(f'{starttime}{nextline}')
 
     best_accuracy = 0.0
     for epoch in range(args.epochs):
@@ -188,7 +196,7 @@ if __name__ == '__main__':
         if state['test_accuracy'] > best_accuracy:
             best_accuracy = state['test_accuracy']
             torch.save(net.state_dict(), os.path.join(
-                args.save, f'{args.dataset}_model.pytorch'))
+                args.save, modeloutput))
         log.write('%s\n' % json.dumps(state))
         # print(state)
         log.write("Best accuracy: %f\n" % best_accuracy)
