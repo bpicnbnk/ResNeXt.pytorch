@@ -55,21 +55,22 @@ if __name__ == '__main__':
     parser.add_argument('--log', type=str, default='./', help='Log folder.')
     args = parser.parse_args()
 
-    
+    nextline = '\n'
+    starttime = datetime.datetime.now()
+    ttuple = starttime.timetuple()
+    startt = '_'.join(list(map(str, ttuple[1:6])))
+
+    # save model name
+    modeloutput = f'{args.dataset}_resnext_{startt}_model.pytorch'
+
     # Init logger
     if not os.path.isdir(args.log):
         os.makedirs(args.log)
-    log = open(os.path.join(args.log, f'log_train_{args.dataset}_{args.ngpu}gpu.txt'), 'w')
+    log = open(os.path.join(
+        args.log, f'resnext_train_{args.dataset}_{args.ngpu}gpu_{startt}.txt'), 'w')
 
-    nextline = '\n'
-    starttime = datetime.datetime.now()
     # log.write(starttime)
     log.write(f'{starttime}{nextline}')
-
-    # save model name
-    ttuple = starttime.timetuple()
-    startt = '_'.join(list(map(str, ttuple[1:6])))
-    modeloutput = f'{args.dataset}_resnext_{startt}_model.pytorch'
 
     state = {k: v for k, v in args._get_kwargs()}
     log.write(json.dumps(state) + '\n')

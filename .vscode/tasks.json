@@ -73,7 +73,19 @@
         {
             "label": "train_ISO_cifar_10",
             "type": "shell",
-            "command": "source /home/server/anaconda3/bin/activate && conda activate pt3.7 && python -u train.py ./DATASETS/cifar.python cifar10 -s ./snapshots --log ./logs --learning_rate 0.05 -b 128 --ngpu 2 --cfg configs/IN1k-RISOnext29_CIFAR10.yaml",
+            "command": "source /home/server/anaconda3/bin/activate && conda activate pt3.7 && python -u trainisonext.py ./DATASETS/cifar.python cifar10 -s ./snapshots --log ./logs --learning_rate 0.05 -b 128 --ngpu 2 --cfg configs/IN1k-RISOnext29_CIFAR10.yaml --gpu_id_list=6,7",
+            "problemMatcher": []
+        },
+        {
+            "label": "flops_ISO",
+            "type": "shell",
+            "command": "source /home/server/anaconda3/bin/activate && conda activate pt3.7 && python -u flopscount.py ./DATASETS/cifar.python cifar10 -s ./snapshots --log ./logs --learning_rate 0.05 -b 128 --ngpu 2 --cfg configs/IN1k-RISOnext29_CIFAR10.yaml --gpu_id_list=6,7",
+            "problemMatcher": []
+        },
+        {
+            "label": "train_ISO_cifar_100",
+            "type": "shell",
+            "command": "source /home/server/anaconda3/bin/activate && conda activate pt3.7 && python -u trainisonext.py ./DATASETS/cifar.python cifar100 -s ./snapshots --log ./logs --learning_rate 0.05 -b 128 --ngpu 2 --cfg configs/IN1k-RISOnext29_CIFAR100.yaml --gpu_id_list=6,7",
             "problemMatcher": []
         },
         {

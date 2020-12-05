@@ -21,9 +21,10 @@ import torch
 import torch.nn.functional as F
 import torchvision.datasets as dset
 import torchvision.transforms as transforms
-from models.model import CifarResNeXt
 
 import os
+from isonet.models.isonext import CifarISONext
+from isonet.utils.config import C
 
 def get_args():
     parser = argparse.ArgumentParser(description='Test ResNeXt on CIFAR', 
@@ -49,13 +50,26 @@ def get_args():
     parser.add_argument('--log', type=str, default='./', help='Log folder.')
     
     parser.add_argument('--gpu_id_list', type=str, default='', help="gpu id")
+
+    parser.add_argument('--cfg', required=True,
+                        help='path to config file', type=str)
+
     
     args = parser.parse_args()
     return args
 
 def test():
+
     # define default variables
     args = get_args()# divide args part and call it as function
+
+    # ---- setup configs ----
+    C.merge_from_file(args.cfg)
+    # C.SOLVER.TRAIN_BATCH_SIZE *= num_gpus
+    # C.SOLVER.TEST_BATCH_SIZE *= num_gpus
+    # C.SOLVER.BASE_LR *= num_gpus
+    C.freeze()
+
     mean = [x / 255 for x in [125.3, 123.0, 113.9]]
     std = [x / 255 for x in [63.0, 62.1, 66.7]]
     state = {k: v for k, v in args._get_kwargs()}
@@ -75,7 +89,7 @@ def test():
                                               num_workers=args.prefetch, pin_memory=True)
 
     # initialize model and load from checkpoint
-    net = CifarResNeXt(args.cardinality, args.depth, nlabels, args.base_width, args.widen_factor)
+    net = CifarISONext(args.cardinality, args.base_width, args.widen_factor)
     loaded_state_dict = torch.load(args.load)
     temp = {}
     for key, val in list(loaded_state_dict.items()):

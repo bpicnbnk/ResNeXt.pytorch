@@ -17,10 +17,31 @@
                 "--ngpu",
                 "2",
                 "--load",
-                "./snapshots/cifar10_model.pytorch",
+                "./snapshots/cifar10_resnext_11_22_21_20_23_model_1.pytorch",
                 "--test_bs",
                 "128",
-                // "--gpu_id_list=3,5"
+                "--gpu_id_list=6,7"
+            ],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "test_iso_c100",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "args": [
+                // "-u",
+                // "test.py",
+                "./DATASETS/cifar.python",
+                "cifar100",
+                "--ngpu",
+                "2",
+                "--load",
+                "./snapshots/isonext_cifar100_model.pytorch",
+                "--test_bs",
+                "128",
+                "--gpu_id_list=6,7",
+                "--cfg=configs/IN1k-RISOnext29_CIFAR100.yaml"
             ],
             "console": "integratedTerminal"
         },

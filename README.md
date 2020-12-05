@@ -20,8 +20,11 @@ To train on Cifar-10 using 2 gpu:
 
 ```bash
 python train.py ./DATASETS/cifar.python cifar10 -s ./snapshots --log ./logs --ngpu 2 --learning_rate 0.05 -b 128
-nohup python -u train.py ./DATASETS/cifar.python cifar10 -s ./snapshots --log ./logs --ngpu 2 --learning_rate 0.05 -b 128 >1.txt 2>&1 &
-nohup python -u train.py ./DATASETS/cifar.python cifar10 -s ./snapshots --log ./logs --ngpu 2 --learning_rate 0.05 -b 128 --gpu_id_list=3,5 >1.txt 2>&1 &
+nohup python -u flopscount.py ./DATASETS/cifar.python cifar10 -s ./snapshots --log ./logs --ngpu 2 --learning_rate 0.05 -b 128 --gpu_id_list=3,5 >c10_resnext.txt 2>&1 &
+nohup python -u train.py ./DATASETS/cifar.python cifar100 -s ./snapshots --log ./logs --ngpu 4 --learning_rate 0.05 -b 128 >c100_resnext.txt 2>&1 &
+
+nohup python -u trainisonext.py ./DATASETS/cifar.python cifar10 -s ./snapshots --log ./logs --learning_rate 0.05 -b 128 --ngpu 2 --cfg configs/IN1k-RISOnext29_CIFAR10.yaml --gpu_id_list=4,5 > c10_isonext.txt 2>&1 &
+nohup python -u trainisonext.py ./DATASETS/cifar.python cifar100 -s ./snapshots --log ./logs --learning_rate 0.05 -b 128 --ngpu 2 --cfg configs/IN1k-RISOnext29_CIFAR100.yaml --gpu_id_list=4,5,6,7 > c100_isonext.txt 2>&1 &
 ```
 It should reach *~3.65%* on Cifar-10, and *~17.77%* on Cifar-100.
 
@@ -33,6 +36,7 @@ After train phase, you can check saved model.
 To test on Cifar-10 using 2 gpu:
 ```bash
 python test.py ./DATASETS/cifar.python cifar10 --ngpu 2 --load ./snapshots/model.pytorch --test_bs 128 
+python test_isonext.py ./DATASETS/cifar.python cifar10 --ngpu 2 --test_bs 128 --cfg configs/IN1k-RISOnext29_CIFAR100.yaml --load ./snapshots/model.pytorch --gpu_id_list=6,7
 ```
 
 
