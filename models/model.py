@@ -23,7 +23,7 @@ class ResNeXtBottleneck(nn.Module):
     RexNeXt bottleneck type C (https://github.com/facebookresearch/ResNeXt/blob/master/models/resnext.lua)
     """
 
-    def __init__(self, in_channels, out_channels, stride, cardinality, base_width, widen_factor):
+    def __init__(self, in_channels, out_channels, stride, cardinality, base_width, groupconv_width):
         """ Constructor
 
         Args:
@@ -33,10 +33,12 @@ class ResNeXtBottleneck(nn.Module):
             cardinality: num of convolution groups.
             base_width: base number of channels in each group.
             widen_factor: factor to reduce the input dimensionality before convolution.
+            groupconv_width:the order of stage
         """
         super(ResNeXtBottleneck, self).__init__()
-        width_ratio = out_channels / (widen_factor * 64.)
-        D = cardinality * int(base_width * width_ratio)
+        # width_ratio = out_channels / (widen_factor * 64.)
+        # D = cardinality * int(base_width * width_ratio)
+        D = groupconv_width
         self.conv_reduce = nn.Conv2d(in_channels, D, kernel_size=1, stride=1, padding=0, bias=False)
         self.bn_reduce = nn.BatchNorm2d(D)
         self.conv_conv = nn.Conv2d(D, D, kernel_size=3, stride=stride, padding=1, groups=cardinality, bias=False)
@@ -87,12 +89,14 @@ class CifarResNeXt(nn.Module):
         self.nlabels = nlabels
         self.output_size = 64
         self.stages = [64, 64 * self.widen_factor, 128 * self.widen_factor, 256 * self.widen_factor]
+        base = self.cardinality*self.base_width
+        self.groupconv_width = [base, base*2, base*4]
 
         self.conv_1_3x3 = nn.Conv2d(3, 64, 3, 1, 1, bias=False)
         self.bn_1 = nn.BatchNorm2d(64)
-        self.stage_1 = self.block('stage_1', self.stages[0], self.stages[1], 1)
-        self.stage_2 = self.block('stage_2', self.stages[1], self.stages[2], 2)
-        self.stage_3 = self.block('stage_3', self.stages[2], self.stages[3], 2)
+        self.stage_1 = self.block(self.groupconv_width[1], 'stage_1', self.stages[0], self.stages[1], 1)
+        self.stage_2 = self.block(self.groupconv_width[2], 'stage_2', self.stages[1], self.stages[2], 2)
+        self.stage_3 = self.block(self.groupconv_width[3], 'stage_3', self.stages[2], self.stages[3], 2)
         self.classifier = nn.Linear(self.stages[3], nlabels)
         init.kaiming_normal(self.classifier.weight)
 
@@ -105,7 +109,7 @@ class CifarResNeXt(nn.Module):
             elif key.split('.')[-1] == 'bias':
                 self.state_dict()[key][...] = 0
 
-    def block(self, name, in_channels, out_channels, pool_stride=2):
+    def block(self, groupconv_width, name, in_channels, out_channels, pool_stride=2):
         """ Stack n bottleneck modules where n is inferred from the depth of the network.
 
         Args:
@@ -122,11 +126,11 @@ class CifarResNeXt(nn.Module):
             name_ = '%s_bottleneck_%d' % (name, bottleneck)
             if bottleneck == 0:
                 block.add_module(name_, ResNeXtBottleneck(in_channels, out_channels, pool_stride, self.cardinality,
-                                                          self.base_width, self.widen_factor))
+                                                          self.base_width, groupconv_width))
             else:
                 block.add_module(name_,
                                  ResNeXtBottleneck(out_channels, out_channels, 1, self.cardinality, self.base_width,
-                                                   self.widen_factor))
+                                                   groupconv_width))
         return block
 
     def forward(self, x):
