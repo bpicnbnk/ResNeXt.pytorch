@@ -63,33 +63,27 @@ if __name__ == '__main__':
     # i/o
     parser.add_argument('--log', type=str, default='./', help='Log folder.')
 
-    parser.add_argument('--cfg', required=True,
-                        help='path to config file', type=str)
+    # parser.add_argument('--cfg', required=True,
+    #                     help='path to config file', type=str)
 
     args = parser.parse_args()
 
     # ---- setup configs ----
-    C.merge_from_file(args.cfg)
+    # C.merge_from_file(args.cfg)
     # C.SOLVER.TRAIN_BATCH_SIZE *= num_gpus
     # C.SOLVER.TEST_BATCH_SIZE *= num_gpus
     # C.SOLVER.BASE_LR *= num_gpus
-    C.freeze()
+    # C.freeze()
 
     with torch.cuda.device(0):
         
-        net = CifarISONext(args.cardinality, args.base_width, args.widen_factor)
+        # net = CifarISONext(args.cardinality, args.base_width, args.widen_factor)
         # -------------------
-        # nlabels = 10
-        # net = CifarResNeXt(args.cardinality, args.depth,
-        #                    nlabels, args.base_width, args.widen_factor)
+        nlabels = 100
+        net = CifarResNeXt(args.cardinality, args.depth,
+                           nlabels, args.base_width, args.widen_factor)
         # -------------------
         macs, params = get_model_complexity_info(net, (3, 32, 32), as_strings=True,
                                             print_per_layer_stat=True, verbose=True)
         print('{:<30}  {:<8}'.format('Computational complexity: ', macs))
         print('{:<30}  {:<8}'.format('Number of parameters: ', params))
-    # with torch.cuda.device(0):
-    #     net = models.densenet161()
-    #     macs, params = get_model_complexity_info(net, (3, 224, 224), as_strings=True,
-    #                                             print_per_layer_stat=True, verbose=True)
-    #     print('{:<30}  {:<8}'.format('Computational complexity: ', macs))
-    #     print('{:<30}  {:<8}'.format('Number of parameters: ', params))

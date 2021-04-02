@@ -116,12 +116,14 @@ class BottleneckTransform(nn.Module):
     """Bottleneck transformation: 1x1, 3x3, 1x1"""
 
     # def __init__(self, in_channels, out_channels, stride, cardinality, base_width, widen_factor):
+    # def __init__(self, in_channels, out_channels, stride, cardinality, base_width, groupconv_width):
     # def __init__(self, w_in, w_out, stride, w_b, num_gs):
-    def __init__(self, w_in, w_out, stride, cardinality, w_b, widen_factor):
+    def __init__(self, w_in, w_out, stride, cardinality, w_b, groupconv_width):
         super(BottleneckTransform, self).__init__()
 
-        width_ratio = w_out / (widen_factor * 64.)
-        D = cardinality * int(w_b * width_ratio)
+        # width_ratio = w_out / (widen_factor * 64.)
+        # D = cardinality * int(w_b * width_ratio)
+        D = groupconv_width
         # MSRA -> stride=2 is on 1x1; TH/C2 -> stride=2 is on 3x3
         (str1x1, str3x3) = (1, stride)
         # 1x1, BN, ReLU
@@ -205,7 +207,7 @@ class ResBlock(nn.Module):
 class ResStage(nn.Module):
     """Stage of ResNet."""
 
-    def __init__(self, w_in, w_out, stride, d, cardinality, w_b, widen_factor=4):
+    def __init__(self, w_in, w_out, stride, d, cardinality, w_b, widen_factor):
         super(ResStage, self).__init__()
         self._construct(w_in, w_out, stride, d, cardinality, w_b, widen_factor)
 
@@ -277,6 +279,9 @@ class CifarISONext(nn.Module):
         # [64,256,512,1024]
         self.stages = [64, 64 * self.widen_factor, 128 *
                        self.widen_factor, 256 * self.widen_factor]
+        self.base_width=w_b
+        base = self.cardinality*self.base_width
+        self.groupconv_width = [base, base*2, base*4]
         # define network structures
         if 'CIFAR' in C.DATASET.NAME:
             self._construct_cifar()
@@ -295,13 +300,13 @@ class CifarISONext(nn.Module):
         self.stem = ResStem(3, self.stages[0])
         # Stage 1: (N, 64, 32, 32) -> (N, 256, 32, 32)
         self.s1 = ResStage(self.stages[0], self.stages[1], stride=1, d=d,
-                           cardinality=self.cardinality, w_b=self.w_b, widen_factor=self.widen_factor)
+                           cardinality=self.cardinality, w_b=self.w_b, widen_factor=self.groupconv_width[0])
         # Stage 2: (N, 256, 32, 32) -> (N, 512, 16, 16)
         self.s2 = ResStage(self.stages[1], self.stages[2], stride=2, d=d,
-                           cardinality=self.cardinality, w_b=self.w_b, widen_factor=self.widen_factor)
+                           cardinality=self.cardinality, w_b=self.w_b, widen_factor=self.groupconv_width[1])
         # Stage 3: (N, 512, 16, 16) -> (N, 1024, 8, 8)
         self.s3 = ResStage(self.stages[2], self.stages[3], stride=2, d=d,
-                           cardinality=self.cardinality, w_b=self.w_b, widen_factor=self.widen_factor)
+                           cardinality=self.cardinality, w_b=self.w_b, widen_factor=self.groupconv_width[2])
         # Head: (N, 1024, 8, 8) -> (N, 10)
         self.head = ResHead(self.stages[3], nc=C.DATASET.NUM_CLASSES)
 
