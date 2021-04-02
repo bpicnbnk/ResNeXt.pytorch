@@ -274,6 +274,7 @@ class CifarISONext(nn.Module):
         self.cardinality = cardinality
         self.w_b = w_b
         self.widen_factor = widen_factor
+        # [64,256,512,1024]
         self.stages = [64, 64 * self.widen_factor, 128 *
                        self.widen_factor, 256 * self.widen_factor]
         # define network structures
@@ -290,18 +291,18 @@ class CifarISONext(nn.Module):
         # Each stage has the same number of blocks for cifar
         # 29
         d = int((C.ISON.DEPTH - 2) / 9)
-        # Stem: (N, 3, 32, 32) -> (N, 16, 32, 32)
+        # Stem: (N, 3, 32, 32) -> (N, 64, 32, 32)
         self.stem = ResStem(3, self.stages[0])
-        # Stage 1: (N, 16, 32, 32) -> (N, 16, 32, 32)
+        # Stage 1: (N, 64, 32, 32) -> (N, 256, 32, 32)
         self.s1 = ResStage(self.stages[0], self.stages[1], stride=1, d=d,
                            cardinality=self.cardinality, w_b=self.w_b, widen_factor=self.widen_factor)
-        # Stage 2: (N, 16, 32, 32) -> (N, 32, 16, 16)
+        # Stage 2: (N, 256, 32, 32) -> (N, 512, 16, 16)
         self.s2 = ResStage(self.stages[1], self.stages[2], stride=2, d=d,
                            cardinality=self.cardinality, w_b=self.w_b, widen_factor=self.widen_factor)
-        # Stage 3: (N, 32, 16, 16) -> (N, 64, 8, 8)
+        # Stage 3: (N, 512, 16, 16) -> (N, 1024, 8, 8)
         self.s3 = ResStage(self.stages[2], self.stages[3], stride=2, d=d,
                            cardinality=self.cardinality, w_b=self.w_b, widen_factor=self.widen_factor)
-        # Head: (N, 64, 8, 8) -> (N, num_classes)
+        # Head: (N, 1024, 8, 8) -> (N, 10)
         self.head = ResHead(self.stages[3], nc=C.DATASET.NUM_CLASSES)
 
     def _network_init(self):

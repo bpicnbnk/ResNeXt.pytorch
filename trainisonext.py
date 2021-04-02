@@ -143,6 +143,7 @@ if __name__ == '__main__':
         os.makedirs(args.save)
 
     # Init model, criterion, and optimizer
+    # 8，64，4
     net = CifarISONext(args.cardinality, args.base_width, args.widen_factor)
     log.write(f'{net}{nextline}')
     log.flush()
