@@ -94,9 +94,9 @@ class CifarResNeXt(nn.Module):
 
         self.conv_1_3x3 = nn.Conv2d(3, 64, 3, 1, 1, bias=False)
         self.bn_1 = nn.BatchNorm2d(64)
-        self.stage_1 = self.block(self.groupconv_width[1], 'stage_1', self.stages[0], self.stages[1], 1)
-        self.stage_2 = self.block(self.groupconv_width[2], 'stage_2', self.stages[1], self.stages[2], 2)
-        self.stage_3 = self.block(self.groupconv_width[3], 'stage_3', self.stages[2], self.stages[3], 2)
+        self.stage_1 = self.block(self.groupconv_width[0], 'stage_1', self.stages[0], self.stages[1], 1)
+        self.stage_2 = self.block(self.groupconv_width[1], 'stage_2', self.stages[1], self.stages[2], 2)
+        self.stage_3 = self.block(self.groupconv_width[2], 'stage_3', self.stages[2], self.stages[3], 2)
         self.classifier = nn.Linear(self.stages[3], nlabels)
         init.kaiming_normal(self.classifier.weight)
 
